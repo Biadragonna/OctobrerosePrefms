@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Jeu 1 — Attrape les cœurs</title>
+  <style>
+    body{font-family:Arial, sans-serif;margin:0;background:#fff0f6;color:#222;display:flex;flex-direction:column;min-height:100vh}
+    header{padding:14px;background:linear-gradient(90deg,#fff,#ffeef6);display:flex;gap:12px;align-items:center}
+    a.retour{background:#e84393;color:white;padding:8px 12px;border-radius:8px;text-decoration:none;font-weight:700}
+    main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}
+    canvas{background:linear-gradient(#fff,#fff0f6);border-radius:12px;box-shadow:0 8px 20px rgba(232,67,147,0.08)}
+    .info{margin-top:12px}
+    button{margin-left:8px;padding:8px 10px;border-radius:8px;border:0;background:#e84393;color:#fff;font-weight:700;cursor:pointer}
+  </style>
+</head>
+<body>
+  <header>
+    <a class="retour" href="index.html">⬅ Retour</a>
+    <h2 style="margin:0">🎮 Jeu 1 — Attrape les cœurs</h2>
+  </header>
+
+  <main>
+    <canvas id="c" width="600" height="360"></canvas>
+    <div class="info">
+      <span id="score">Score: 0</span>
+      <button id="restart">Recommencer</button>
+    </div>
+  </main>
+
+  <script>
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+    let score = 0;
+    const hearts = [];
+    const maxHearts = 6;
+
+    function rand(min,max){return Math.random()*(max-min)+min}
+
+    function createHeart(){
+      const size = rand(24,48);
+      hearts.push({
+        x: rand(size, canvas.width - size),
+        y: canvas.height + 30,
+        size,
+        speed: rand(0.6,1.6)
+      });
+      if(hearts.length > maxHearts) hearts.shift();
+    }
+
+    function drawHeart(x,y,size){
+      ctx.save();
+      ctx.translate(x,y);
+      ctx.beginPath();
+      const topCurveHeight = size * 0.3;
+      ctx.moveTo(0, topCurveHeight);
+      ctx.bezierCurveTo(0, topCurveHeight - size/2, -size/2, topCurveHeight - size/2, -size/2, topCurveHeight);
+      ctx.bezierCurveTo(-size/2, topCurveHeight + size/2, 0, topCurveHeight + size*0.9, 0, size);
+      ctx.bezierCurveTo(0, topCurveHeight + size*0.9, size/2, topCurveHeight + size/2, size/2, topCurveHeight);
+      ctx.bezierCurveTo(size/2, topCurveHeight - size/2, 0, topCurveHeight - size/2, 0, topCurveHeight);
+      ctx.fillStyle = '#e84393';
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function update(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      // apparitions
+      if(Math.random() < 0.02) createHeart();
+
+      for(let i=hearts.length-1;i>=0;i--){
+        hearts[i].y -= hearts[i].speed;
+        drawHeart(hearts[i].x, hearts[i].y, hearts[i].size);
+        // retire si trop haut
+        if(hearts[i].y < -50) hearts.splice(i,1);
+      }
+      requestAnimationFrame(update);
+    }
+
+    canvas.addEventListener('click', e=>{
+      const r = canvas.getBoundingClientRect();
+      const mx = e.clientX - r.left;
+      const my = e.clientY - r.top;
+      for(let i=hearts.length-1;i>=0;i--){
+        const h = hearts[i];
+        const dx = mx - h.x;
+        const dy = my - h.y;
+        if(Math.sqrt(dx*dx+dy*dy) < h.size){
+          hearts.splice(i,1);
+          score += 1;
+          document.getElementById('score').textContent = 'Score: ' + score;
+        }
+      }
+    });
+
+    document.getElementById('restart').addEventListener('click', ()=>{
+      score = 0; hearts.length = 0; document.getElementById('score').textContent = 'Score: 0';
+    });
+
+    update();
+  </script>
+</body>
+</html>
