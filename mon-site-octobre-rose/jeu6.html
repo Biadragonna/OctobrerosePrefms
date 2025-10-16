@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Labyrinthe Octobre Rose - Accessible</title>
+<style>
+body{margin:0;font-family:'Poppins',sans-serif;background:linear-gradient(135deg,#ffe6f0,#ffd6eb);display:flex;flex-direction:column;align-items:center;min-height:100vh;color:#e84393;overflow:hidden;position:relative;}
+header{width:100%;text-align:left;padding:15px;background:#fff0f6;box-shadow:0 2px 8px rgba(232,67,147,0.1);display:flex;justify-content:space-between;align-items:center;position:relative;z-index:5;}
+a.retour{background:#e84393;color:white;padding:8px 12px;border-radius:10px;text-decoration:none;font-weight:600;transition:0.3s;}
+a.retour:hover{background:#ffb6c1;}
+button,select{padding:10px 15px;border-radius:10px;border:none;font-weight:bold;cursor:pointer;}
+button{background:#e84393;color:white;transition:0.3s;}
+button:hover{background:#ffb6c1;color:#fff;}
+select{background:#fff;color:#e84393;border:2px solid #e84393;}
+canvas{border-radius:12px;box-shadow:0 6px 20px rgba(232,67,147,0.2);background:#fff0f6;margin-bottom:20px;position:relative;z-index:2;}
+.controls{margin:20px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center;position:relative;z-index:5;}
+.victory{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(255,255,255,0.95);display:none;align-items:center;justify-content:center;flex-direction:column;z-index:10;color:#e84393;font-size:1.6em;font-weight:bold;text-align:center;animation:fadein 1s ease forwards;}
+@keyframes fadein{from{opacity:0;}to{opacity:1;}}
+.victory button{margin-top:20px;background:#e84393;color:white;border:none;border-radius:12px;padding:12px 18px;font-size:1em;cursor:pointer;}
+#scoresTable{margin-top:20px;border-collapse:collapse;width:90%;max-width:600px;position:relative;z-index:5;}
+#scoresTable th,#scoresTable td{border:1px solid #e84393;padding:6px;text-align:center;}
+.trophy{font-size:3em;margin:10px 0;transform-origin:center;}
+#background{position:fixed;top:0;left:0;z-index:-1;width:100%;height:100%;}
+#maze{position:relative;z-index:2;}
+</style>
+</head>
+<body>
+
+<header>
+  <a href="index.html" class="retour">⬅ Retour</a>
+  <button id="soundToggle">🔊 Son</button>
+</header>
+
+<h1>🏃‍♀️ Labyrinthe Octobre Rose</h1>
+
+<div class="controls">
+  <label for="difficulty">Difficulté :</label>
+  <select id="difficulty">
+    <option value="easy">Facile</option>
+    <option value="medium" selected>Moyen</option>
+    <option value="hard">Difficile</option>
+  </select>
+  <button id="start">Nouvelle partie</button>
+</div>
+
+<div>
+  <span>⏱ Temps : <span id="timer">0s</span></span>
+</div>
+
+<!-- Canvas fond interactif -->
+<canvas id="background"></canvas>
+
+<!-- Canvas labyrinthe -->
+<canvas id="maze" width="600" height="600"></canvas>
+
+<div class="victory" id="victory">
+  <div class="trophy" id="trophy">🏆</div>
+  🎉 Bravo ! Tu as terminé le labyrinthe 💕<br>
+  <span id="message">💗 Ensemble, faisons reculer le cancer du sein. Passe sur notre stand !</span>
+  <button id="replay">Rejouer</button>
+</div>
+
+<h2>🏅 Meilleurs temps</h2>
+<table id="scoresTable">
+  <thead>
+    <tr><th>Pseudo</th><th>Filière</th><th>Temps</th><th>Date</th><th>Récompense</th></tr>
+  </thead>
+  <tbody id="scoresBody"></tbody>
+</table>
+
+<audio id="music" loop>
+  <source src="https://cdn.pixabay.com/download/audio/2023/03/31/audio_1a7e9f74e4.mp3?filename=soft-relaxing-background-music-11257.mp3" type="audio/mpeg">
+</audio>
+
+<script>
+// ==== Variables ====
+const canvas=document.getElementById('maze');
+const ctx=canvas.getContext('2d');
+const bgCanvas=document.getElementById('background');
+const bgCtx=bgCanvas.getContext('2d');
+const startBtn=document.getElementById('start');
+const diffSelect=document.getElementById('difficulty');
+const victoryScreen=document.getElementById('victory');
+const replayBtn=document.getElementById('replay');
+const timerSpan=document.getElementById('timer');
+const soundBtn=document.getElementById('soundToggle');
+const music=document.getElementById('music');
+const scoresBody=document.getElementById('scoresBody');
+
+let maze=[], rows=10, cols=10, cellSize, player={x:0,y:0}, exit={x:0,y:0};
+let timer=0, timerInterval=null, musicOn=true;
+
+// ==== Labyrinthe solvable DFS + chemin garanti vers la sortie ====
+function generateMaze(diff){
+  clearInterval(timerInterval); timer=0; timerSpan.textContent='0s';
+  switch(diff){
+    case 'easy': rows=cols=10; break;
+    case 'medium': rows=cols=15; break;
+    case 'hard': rows=cols=20; break;
+  }
+  cellSize=Math.floor(canvas.width/cols);
+  maze=Array.from({length:rows},()=>Array(cols).fill(1));
+  
+  function shuffle(array){for(let i=array.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[array[i],array[j]]=[array[j],array[i]];}return array;}
+  
+  function carve(x,y){
+    maze[y][x]=0;
+    let dirs=shuffle([[1,0],[-1,0],[0,1],[0,-1]]);
+    dirs.forEach(([dx,dy])=>{
+      const nx=x+dx*2, ny=y+dy*2;
+      if(nx>=0 && ny>=0 && nx<cols && ny<rows && maze[ny][nx]===1){
+        maze[y+dy][x+dx]=0;
+        carve(nx,ny);
+      }
+    });
+  }
+
+  carve(0,0);
+  
+  // ==== Assurer chemin vers la sortie ====
+  function ensureExitPath(){
+    let x=0, y=0;
+    while(x!==cols-1 || y!==rows-1){
+      maze[y][x]=0;
+      if(x<cols-1 && Math.random()<0.5) x++; 
+      else if(y<rows-1) y++; 
+      else x++;
+    }
+    maze[rows-1][cols-1]=0;
+  }
+  ensureExitPath();
+
+  player={x:0,y:0}; exit={x:cols-1,y:rows-1};
+  drawMaze();
+  timerInterval=setInterval(()=>{timer++; timerSpan.textContent=timer+'s';},1000);
+}
+
+// ==== Dessin labyrinthe ====
+function drawMaze(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      ctx.fillStyle=maze[r][c]===1?'#e84393':'#fff0f6';
+      ctx.fillRect(c*cellSize,r*cellSize,cellSize,cellSize);
+    }
+  }
+  ctx.fillStyle='#ff69b4'; ctx.fillRect(player.x*cellSize+2,player.y*cellSize+2,cellSize-4,cellSize-4);
+  ctx.fillStyle='#ffd6eb'; ctx.fillRect(exit.x*cellSize+2,exit.y*cellSize+2,cellSize-4,cellSize-4);
+}
+
+// ==== Déplacements joueur ====
+function movePlayer(dx,dy){
+  const nx=player.x+dx, ny=player.y+dy;
+  if(nx>=0 && ny>=0 && nx<cols && ny<rows && maze[ny][nx]===0){
+    player.x=nx; player.y=ny; drawMaze(); checkWin();
+  }
+}
+
+// ==== Vérifier victoire ====
+function checkWin(){
+  if(player.x===exit.x && player.y===exit.y){
+    clearInterval(timerInterval); showVictory();
+    if(diffSelect.value==='hard'){
+      let pseudo=prompt('🎉 Niveau difficile terminé ! Entrez votre pseudo :');
+      let filiere=prompt('Entrez votre filière :');
+      saveScore(pseudo,filiere,timer);
+    }
+  }
+}
+
+// ==== Victoire animée + confettis ====
+function showVictory(){
+  victoryScreen.style.display='flex';
+  victoryScreen.style.background='linear-gradient(135deg,#ffdee9,#ffb6c1)';
+  const trophy=document.getElementById('trophy');
+  trophy.style.transform='scale(0) rotate(0deg)';
+  trophy.style.transition='transform 1s cubic-bezier(0.68,-0.55,0.27,1.55)';
+  setTimeout(()=>{trophy.style.transform='scale(1.5) rotate(360deg)';},100);
+  launchConfetti();
+}
+
+// ==== Confettis ====
+function launchConfetti(){
+  const colors=['#e84393','#ffb6c1','#f8a1c4','#fff','#ff69b4','#ffa3b1'];
+  const shapes=['square','circle','triangle'];
+  const confetti=document.createElement('canvas');
+  confetti.width=window.innerWidth; confetti.height=window.innerHeight;
+  confetti.style.position='fixed'; confetti.style.top=0; confetti.style.left=0; confetti.style.pointerEvents='none';
+  document.body.appendChild(confetti);
+  const ctx2=confetti.getContext('2d');
+  const pieces=Array.from({length:300},()=>({
+    x:Math.random()*confetti.width,
+    y:Math.random()*confetti.height-confetti.height,
+    size:Math.random()*8+4,
+    color:colors[Math.floor(Math.random()*colors.length)],
+    speed:Math.random()*3+1,
+    shape:shapes[Math.floor(Math.random()*shapes.length)],
+    angle:Math.random()*360,
+    rotationSpeed:(Math.random()-0.5)*10
+  }));
+  function animate(){
+    ctx2.clearRect(0,0,confetti.width,confetti.height);
+    pieces.forEach(p=>{
+      p.y+=p.speed; p.angle+=p.rotationSpeed;
+      if(p.y>confetti.height)p.y=-10;
+      ctx2.save();
+      ctx2.translate(p.x,p.y);
+      ctx2.rotate(p.angle*Math.PI/180);
+      ctx2.fillStyle=p.color;
+      switch(p.shape){
+        case 'square': ctx2.fillRect(-p.size/2,-p.size/2,p.size,p.size); break;
+        case 'circle': ctx2.beginPath(); ctx2.arc(0,0,p.size/2,0,Math.PI*2); ctx2.fill(); break;
+        case 'triangle': ctx2.beginPath(); ctx2.moveTo(0,-p.size/2); ctx2.lineTo(-p.size/2,p.size/2); ctx2.lineTo(p.size/2,p.size/2); ctx2.closePath(); ctx2.fill(); break;
+      }
+      ctx2.restore();
+    });
+    requestAnimationFrame(animate);
+  }
+  animate();
+  setTimeout(()=>confetti.remove(),8000);
+}
+
+// ==== Scores ====
+function saveScore(pseudo,filiere,time){
+  const scores=JSON.parse(localStorage.getItem('scores')||'[]');
+  const date=new Date().toLocaleDateString();
+  scores.push({pseudo,filiere,time,date});
+  scores.sort((a,b)=>a.time-b.time);
+  if(scores.length>10)scores.pop();
+  localStorage.setItem('scores',JSON.stringify(scores));
+  renderScores();
+}
+
+function renderScores(){
+  const scores=JSON.parse(localStorage.getItem('scores')||'[]');
+  scoresBody.innerHTML='';
+  scores.forEach((s,i)=>{
+    let medal='';
+    if(i===0)medal='🥇'; else if(i===1)medal='🥈'; else if(i===2)medal='🥉';
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${s.pseudo}</td><td>${s.filiere}</td><td>${s.time}s</td><td>${s.date}</td><td>${medal}</td>`;
+    scoresBody.appendChild(tr);
+  });
+}
+
+// ==== Déplacements clavier ====
+document.addEventListener('keydown',e=>{
+  switch(e.key){
+    case 'ArrowUp': movePlayer(0,-1); break;
+    case 'ArrowDown': movePlayer(0,1); break;
+    case 'ArrowLeft': movePlayer(-1,0); break;
+    case 'ArrowRight': movePlayer(1,0); break;
+  }
+});
+
+// ==== Boutons ====
+startBtn.onclick=()=>{victoryScreen.style.display='none'; generateMaze(diffSelect.value);};
+replayBtn.onclick=()=>{victoryScreen.style.display='none'; generateMaze(diffSelect.value);};
+soundBtn.onclick=()=>{if(musicOn){music.pause(); musicOn=false; soundBtn.textContent='🔇 Son';} else{music.play(); musicOn=true; soundBtn.textContent='🔊 Son';}};
+
+// ==== Fond interactif bulles pleine page ====
+let particles=[];
+function createBgParticles(num=150){
+  particles=[];
+  const colors=['#ffe6f0','#ffb6c1','#ff99c8','#ff80aa','#ff69b4'];
+  for(let i=0;i<num;i++){
+    particles.push({x:Math.random()*window.innerWidth,y:Math.random()*window.innerHeight,size:Math.random()*20+5,speed:Math.random()*1+0.2,angle:Math.random()*360,color:colors[Math.floor(Math.random()*colors.length)]});
+  }
+}
+function animateBgParticles(){
+  bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height);
+  particles.forEach(p=>{
+    p.y-=p.speed;
+    if(p.y<-p.size)p.y=bgCanvas.height+p.size;
+    p.angle+=0.5;
+    bgCtx.save();
+    bgCtx.translate(p.x,p.y);
+    bgCtx.rotate(p.angle*Math.PI/180);
+    bgCtx.fillStyle=p.color;
+    bgCtx.beginPath();
+    bgCtx.arc(0,0,p.size/2,0,Math.PI*2);
+    bgCtx.fill();
+    bgCtx.restore();
+  });
+  requestAnimationFrame(animateBgParticles);
+}
+function resizeBackground(){ bgCanvas.width=window.innerWidth; bgCanvas.height=window.innerHeight; }
+window.addEventListener('resize',()=>{
+  resizeBackground();
+  createBgParticles(150);
+});
+resizeBackground();
+createBgParticles(150);
+animateBgParticles();
+
+music.play();
+renderScores();
+generateMaze(diffSelect.value);
+</script>
+
+</body>
+</html>
+

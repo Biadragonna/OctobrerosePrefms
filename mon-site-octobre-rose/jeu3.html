@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jeu 3 — Puzzle Octobre Rose</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(135deg, #ffe6f0, #ffd6eb);
+      color: #e84393;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    header {
+      width: 100%;
+      text-align: left;
+      padding: 15px;
+      background: #fff0f6;
+      box-shadow: 0 2px 8px rgba(232, 67, 147, 0.1);
+    }
+
+    a.retour {
+      background: #e84393;
+      color: white;
+      padding: 8px 12px;
+      border-radius: 10px;
+      text-decoration: none;
+      font-weight: 600;
+      transition: 0.3s;
+    }
+
+    a.retour:hover {
+      background: #ffb6c1;
+    }
+
+    h1 {
+      text-align: center;
+      color: #e84393;
+      margin-top: 10px;
+    }
+
+    .controls {
+      margin: 20px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+    }
+
+    select, button {
+      padding: 10px 15px;
+      border-radius: 10px;
+      border: none;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    select {
+      background: #fff;
+      color: #e84393;
+      border: 2px solid #e84393;
+    }
+
+    button {
+      background: #e84393;
+      color: white;
+      transition: 0.3s;
+    }
+
+    button:hover {
+      background: #ffb6c1;
+      color: #fff;
+    }
+
+    canvas {
+      border-radius: 12px;
+      box-shadow: 0 6px 20px rgba(232, 67, 147, 0.2);
+      margin-bottom: 20px;
+    }
+
+    .victory {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.9);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      z-index: 10;
+      color: #e84393;
+      font-size: 1.8em;
+      font-weight: bold;
+      text-align: center;
+      animation: fadein 1s ease forwards;
+    }
+
+    @keyframes fadein {
+      from {opacity: 0;}
+      to {opacity: 1;}
+    }
+
+    .victory button {
+      margin-top: 20px;
+      background: #e84393;
+      color: white;
+      border: none;
+      border-radius: 12px;
+      padding: 12px 18px;
+      font-size: 1em;
+      cursor: pointer;
+    }
+
+    footer {
+      font-size: 0.9em;
+      color: #e84393;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <audio id="music" loop autoplay>
+    <source src="assets/musique.mp3" type="audio/mpeg">
+  </audio>
+
+  <header>
+    <a href="index.html" class="retour">⬅ Retour</a>
+  </header>
+
+  <h1>🧩 Puzzle Octobre Rose</h1>
+
+  <div class="controls">
+    <label for="difficulty">Difficulté :</label>
+    <select id="difficulty">
+      <option value="3">Facile (3x3)</option>
+      <option value="4" selected>Moyen (4x4)</option>
+      <option value="5">Difficile (5x5)</option>
+    </select>
+    <button id="start">Nouvelle partie</button>
+  </div>
+
+  <canvas id="puzzle" width="600" height="600"></canvas>
+
+  <div class="victory" id="victory">
+    🎉 Bravo ! Tu as reconstitué l’image 💕  
+    <button id="replay">Rejouer</button>
+  </div>
+
+  <footer>
+    💗 Ensemble, faisons reculer le cancer du sein 💗
+  </footer>
+
+  <script>
+    const canvas = document.getElementById('puzzle');
+    const ctx = canvas.getContext('2d');
+    const startBtn = document.getElementById('start');
+    const diffSelect = document.getElementById('difficulty');
+    const victoryScreen = document.getElementById('victory');
+    const replayBtn = document.getElementById('replay');
+
+    const IMAGES = [
+      'assets/puzzle1.jpg',
+      'assets/puzzle2.jpg',
+      'assets/puzzle3.jpg',
+      'assets/puzzle4.jpg',
+      'assets/puzzle5.jpg'
+    ];
+
+    let pieces = [];
+    let rows = 4, cols = 4;
+    let img, selected = null;
+
+    function shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function startGame() {
+      victoryScreen.style.display = 'none';
+      rows = cols = parseInt(diffSelect.value);
+      const randomImg = IMAGES[Math.floor(Math.random() * IMAGES.length)];
+      img = new Image();
+      img.src = randomImg;
+      img.onload = () => createPuzzle();
+    }
+
+    function createPuzzle() {
+      const pieceW = canvas.width / cols;
+      const pieceH = canvas.height / rows;
+      pieces = [];
+
+      // liste des positions correctes
+      const positions = [];
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          positions.push({x: c, y: r});
+        }
+      }
+
+      const shuffled = shuffle([...positions]);
+
+      for (let i = 0; i < positions.length; i++) {
+        pieces.push({
+          correctX: positions[i].x,
+          correctY: positions[i].y,
+          x: shuffled[i].x,
+          y: shuffled[i].y
+        });
+      }
+
+      drawPuzzle();
+      canvas.onclick = handleClick;
+    }
+
+    function drawPuzzle() {
+      const pieceW = canvas.width / cols;
+      const pieceH = canvas.height / rows;
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      pieces.forEach((p) => {
+        const sx = p.correctX * pieceW;
+        const sy = p.correctY * pieceH;
+        const dx = p.x * pieceW;
+        const dy = p.y * pieceH;
+        ctx.drawImage(img, sx, sy, pieceW, pieceH, dx, dy, pieceW, pieceH);
+        ctx.strokeStyle = "#fff";
+        ctx.strokeRect(dx, dy, pieceW, pieceH);
+      });
+    }
+
+    function animateSwap(piece1, piece2, callback) {
+      const pieceW = canvas.width / cols;
+      const pieceH = canvas.height / rows;
+      const frames = 15;
+      let count = 0;
+
+      const start1 = {x: piece1.x, y: piece1.y};
+      const start2 = {x: piece2.x, y: piece2.y};
+      const dx1 = (piece2.x - piece1.x) / frames;
+      const dy1 = (piece2.y - piece1.y) / frames;
+      const dx2 = (piece1.x - piece2.x) / frames;
+      const dy2 = (piece1.y - piece2.y) / frames;
+
+      function step() {
+        if (count < frames) {
+          piece1.x += dx1;
+          piece1.y += dy1;
+          piece2.x += dx2;
+          piece2.y += dy2;
+          drawPuzzle();
+          count++;
+          requestAnimationFrame(step);
+        } else {
+          piece1.x = start2.x;
+          piece1.y = start2.y;
+          piece2.x = start1.x;
+          piece2.y = start1.y;
+          drawPuzzle();
+          if (callback) callback();
+        }
+      }
+      step();
+    }
+
+    function handleClick(e) {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const pieceW = canvas.width / cols;
+      const pieceH = canvas.height / rows;
+      const col = Math.floor(x / pieceW);
+      const row = Math.floor(y / pieceH);
+      const clicked = pieces.find(p => Math.round(p.x) === col && Math.round(p.y) === row);
+      if (!clicked) return;
+
+      if (!selected) {
+        selected = clicked;
+        drawPuzzle();
+        ctx.strokeStyle = "#e84393";
+        ctx.lineWidth = 5;
+        ctx.strokeRect(selected.x * pieceW, selected.y * pieceH, pieceW, pieceH);
+      } else {
+        canvas.onclick = null; // bloque le clic pendant l'animation
+        animateSwap(selected, clicked, () => {
+          selected = null;
+          drawPuzzle();
+          checkWin();
+          canvas.onclick = handleClick; // réactive le clic
+        });
+      }
+    }
+
+    function checkWin() {
+      const won = pieces.every(p => Math.round(p.x) === p.correctX && Math.round(p.y) === p.correctY);
+      if (won) showVictory();
+    }
+
+    function showVictory() {
+      victoryScreen.style.display = 'flex';
+      launchConfetti();
+    }
+
+    function launchConfetti() {
+      const colors = ['#e84393', '#ffb6c1', '#f8a1c4', '#fff'];
+      const confetti = document.createElement('canvas');
+      confetti.width = window.innerWidth;
+      confetti.height = window.innerHeight;
+      confetti.style.position = 'fixed';
+      confetti.style.top = 0;
+      confetti.style.left = 0;
+      confetti.style.pointerEvents = 'none';
+      document.body.appendChild(confetti);
+      const ctx2 = confetti.getContext('2d');
+      const pieces = Array.from({length: 150}, () => ({
+        x: Math.random() * confetti.width,
+        y: Math.random() * confetti.height - confetti.height,
+        size: Math.random() * 6 + 4,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        speed: Math.random() * 2 + 1
+      }));
+      function animate() {
+        ctx2.clearRect(0,0,confetti.width,confetti.height);
+        pieces.forEach(p => {
+          p.y += p.speed;
+          if (p.y > confetti.height) p.y = -10;
+          ctx2.fillStyle = p.color;
+          ctx2.fillRect(p.x, p.y, p.size, p.size);
+        });
+        requestAnimationFrame(animate);
+      }
+      animate();
+      setTimeout(()=>confetti.remove(), 6000);
+    }
+
+    startBtn.onclick = startGame;
+    replayBtn.onclick = startGame;
+
+    startGame();
+  </script>
+</body>
+</html>
+

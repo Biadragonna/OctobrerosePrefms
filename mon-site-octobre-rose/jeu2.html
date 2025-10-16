@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Jeu 2 — Mémo</title>
+  <style>
+    body{font-family:Arial;margin:0;display:flex;flex-direction:column;min-height:100vh;background:#fffafc}
+    header{padding:12px;background:linear-gradient(90deg,#fff,#ffeef6);display:flex;align-items:center;gap:12px}
+    a.retour{background:#e84393;color:white;padding:8px 12px;border-radius:8px;text-decoration:none;font-weight:700}
+    main{flex:1;padding:18px;display:flex;flex-direction:column;align-items:center}
+    .grid{display:grid;grid-template-columns:repeat(4,100px);gap:12px}
+    .card{width:100px;height:100px;border-radius:10px;background:#fff;border:2px solid #ffd6e6;display:flex;align-items:center;justify-content:center;font-size:32px;cursor:pointer;user-select:none}
+    .flipped{background:#e84393;color:#fff}
+    .hidden{visibility:hidden}
+  </style>
+</head>
+<body>
+  <header>
+    <a class="retour" href="index.html">⬅ Retour</a>
+    <h2 style="margin:0">🧠 Jeu 2 — Mémo Octobre Rose</h2>
+  </header>
+  <main>
+    <p>Retourne les cartes deux par deux pour trouver les paires.</p>
+    <div class="grid" id="grid"></div>
+    <div style="margin-top:12px">
+      <button id="reset" style="padding:8px 12px;border-radius:8px;border:0;background:#e84393;color:#fff;font-weight:700">Nouvelle partie</button>
+    </div>
+  </main>
+
+  <script>
+    const icons = ['🎀','💕','💗','🌸','🎗️','💪','🌷','🩷']; // 8 paires -> 16 cartes
+    let deck = [];
+    const grid = document.getElementById('grid');
+    let first = null, second = null, lock = false;
+
+    function shuffle(a){return a.sort(()=>Math.random()-0.5)}
+
+    function build(){
+      grid.innerHTML = '';
+      deck = shuffle([...icons, ...icons]);
+      deck.forEach((symbol, i)=>{
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.dataset.symbol = symbol;
+        div.dataset.index = i;
+        div.textContent = '';
+        div.addEventListener('click', onClick);
+        grid.appendChild(div);
+      });
+    }
+
+    function onClick(e){
+      if(lock) return;
+      const card = e.currentTarget;
+      if(card.classList.contains('flipped')) return;
+      card.classList.add('flipped');
+      card.textContent = card.dataset.symbol;
+
+      if(!first) first = card;
+      else {
+        second = card;
+        lock = true;
+        if(first.dataset.symbol === second.dataset.symbol){
+          setTimeout(()=>{
+            first.classList.add('hidden'); second.classList.add('hidden');
+            resetTurn();
+          },500);
+        } else {
+          setTimeout(()=>{
+            first.classList.remove('flipped'); first.textContent = '';
+            second.classList.remove('flipped'); second.textContent = '';
+            resetTurn();
+          },800);
+        }
+      }
+    }
+
+    function resetTurn(){ first = null; second = null; lock = false; checkWin(); }
+
+    function checkWin(){
+      const remaining = Array.from(document.querySelectorAll('.card')).filter(c=>!c.classList.contains('hidden'));
+      if(remaining.length === 0){
+        setTimeout(()=>alert('Bravo ! Tu as trouvé toutes les paires 🎉'),200);
+      }
+    }
+
+    document.getElementById('reset').addEventListener('click', build);
+    build();
+  </script>
+</body>
+</html>
